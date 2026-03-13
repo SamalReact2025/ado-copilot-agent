@@ -1,4 +1,4 @@
-# azure-copilot-sdlc
+# ado-copilot-agent
 
 Azure DevOps work item lifecycle automation using GitHub Copilot CLI.
 
@@ -17,19 +17,19 @@ Run commands directly without building executables:
 
 ```bash
 # View all available commands
-uv run azure-copilot-sdlc --help
+uv run ado-copilot-agent --help
 
 # Plan a work item
-uv run azure-copilot-sdlc plan execute 123
+uv run ado-copilot-agent plan execute 123
 
 # Develop a feature
-uv run azure-copilot-sdlc develop execute 123
+uv run ado-copilot-agent develop execute 123
 
 # Review code changes
-uv run azure-copilot-sdlc review execute 123
+uv run ado-copilot-agent review execute 123
 
 # Run full lifecycle (plan + develop + review)
-uv run azure-copilot-sdlc complete 123
+uv run ado-copilot-agent complete 123
 ```
 
 ### Production (Compiled Executable)
@@ -41,8 +41,8 @@ Build a standalone executable to distribute:
 uv run python build.py
 
 # Run the executable
-./dist/azure-copilot-sdlc --help
-./dist/azure-copilot-sdlc plan execute 123
+./dist/ado-copilot-agent --help
+./dist/ado-copilot-agent plan execute 123
 ```
 
 For more build options, see [BUILD.md](BUILD.md).
@@ -53,35 +53,35 @@ For more build options, see [BUILD.md](BUILD.md).
 Generate an AI implementation plan for a work item:
 
 ```bash
-uv run azure-copilot-sdlc plan execute 123
-uv run azure-copilot-sdlc plan execute 123 -d /path/to/repo
-uv run azure-copilot-sdlc plan execute 123 -y  # Skip confirmations
+uv run ado-copilot-agent plan execute 123
+uv run ado-copilot-agent plan execute 123 -d /path/to/repo
+uv run ado-copilot-agent plan execute 123 -y  # Skip confirmations
 ```
 
 ### Develop
 Implement a feature based on the plan:
 
 ```bash
-uv run azure-copilot-sdlc develop execute 123
-uv run azure-copilot-sdlc develop execute 123 -d /path/to/repo
+uv run ado-copilot-agent develop execute 123
+uv run ado-copilot-agent develop execute 123 -d /path/to/repo
 ```
 
 ### Review
 Review code changes:
 
 ```bash
-uv run azure-copilot-sdlc review execute 123
-uv run azure-copilot-sdlc review execute 123 -d /path/to/repo
+uv run ado-copilot-agent review execute 123
+uv run ado-copilot-agent review execute 123 -d /path/to/repo
 ```
 
 ### Complete
 Run the full lifecycle (plan, develop, and review) in sequence:
 
 ```bash
-uv run azure-copilot-sdlc complete 123
-uv run azure-copilot-sdlc complete 123 -d /path/to/repo
-uv run azure-copilot-sdlc complete 123 -m claude-sonnet-4.6
-uv run azure-copilot-sdlc complete 123 -b main  # use 'main' as base branch
+uv run ado-copilot-agent complete 123
+uv run ado-copilot-agent complete 123 -d /path/to/repo
+uv run ado-copilot-agent complete 123 -m claude-sonnet-4.6
+uv run ado-copilot-agent complete 123 -b main  # use 'main' as base branch
 ```
 
 ## Configuration
@@ -90,8 +90,8 @@ uv run azure-copilot-sdlc complete 123 -b main  # use 'main' as base branch
 
 Create `.env` in your user home directory:
 
-**Windows:** `%USERPROFILE%\.azure-copilot-sdlc\.env`
-**Linux/macOS:** `~/.azure-copilot-sdlc/.env`
+**Windows:** `%USERPROFILE%\.ado-copilot-agent\.env`
+**Linux/macOS:** `~/.ado-copilot-agent/.env`
 
 Required variables:
 ```
@@ -140,7 +140,7 @@ src/
 ├── models/                # Data structures
 ├── utilities/             # Helpers and config
 ├── build.py               # PyInstaller build script
-├── azure-copilot-sdlc.spec  # Build configuration
+├── ado-copilot-agent.spec  # Build configuration
 ├── pyproject.toml         # Project metadata
 ├── .env.example           # Example environment file
 ├── BUILD.md              # Build documentation

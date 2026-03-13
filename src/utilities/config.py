@@ -24,13 +24,13 @@ def load_env_from_home():
     home = Path.home()
 
     if sys.platform == "win32":
-        # Windows: C:\Users\{username}\.azure-copilot-sdlc\.env
-        env_path = home / ".azure-copilot-sdlc" / ".env"
-        config_dir = home / ".azure-copilot-sdlc"
+        # Windows: C:\Users\{username}\.ado-copilot-agent\.env
+        env_path = home / ".ado-copilot-agent" / ".env"
+        config_dir = home / ".ado-copilot-agent"
     else:
-        # Unix/Linux/Mac: ~/.azure-copilot-sdlc/.env
-        env_path = home / ".azure-copilot-sdlc" / ".env"
-        config_dir = home / ".azure-copilot-sdlc"
+        # Unix/Linux/Mac: ~/.ado-copilot-agent/.env
+        env_path = home / ".ado-copilot-agent" / ".env"
+        config_dir = home / ".ado-copilot-agent"
 
     project_env_path = Path.cwd() / ".env"
 
@@ -99,7 +99,7 @@ def get_env_variable(var_name: str, prompt_text: str = None, password: bool = Tr
 def get_config_dir() -> Path:
     """Get the config directory path"""
     home = Path.home()
-    return home / ".azure-copilot-sdlc"
+    return home / ".ado-copilot-agent"
 
 
 def get_env_path() -> Path:

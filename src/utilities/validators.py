@@ -45,7 +45,7 @@ def validate_work_item_id(work_item_id: str) -> int:
 def validate_environment_variable(var_name: str, prompt_text: str = None) -> str:
     """Validate environment variable exists in .env file, prompt user if missing
     
-    This function uses the .env file in ~/.azure-copilot-sdlc/.env instead of
+    This function uses the .env file in ~/.ado-copilot-agent/.env instead of
     OS environment variables. If the variable is not found, it prompts the user
     and saves it to the .env file for future use.
     """

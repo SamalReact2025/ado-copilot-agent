@@ -33,7 +33,7 @@ uv sync
 
 ## Configuration
 
-Credentials are stored in `~/.azure-copilot-sdlc/.env` (created automatically on first run):
+Credentials are stored in `~/.ado-copilot-agent/.env` (created automatically on first run):
 
 ```env
 ADO_MCP_AUTH_TOKEN=your_azure_devops_pat
@@ -72,8 +72,8 @@ All commands accept a work item ID and an optional `--directory` pointing to you
 Generate an implementation plan and save it as a comment on the work item.
 
 ```bash
-uv run azure-copilot-sdlc plan <work-item-id> -d /path/to/repo
-uv run azure-copilot-sdlc plan <work-item-id> -d /path/to/repo -m gpt-4
+uv run ado-copilot-agent plan <work-item-id> -d /path/to/repo
+uv run ado-copilot-agent plan <work-item-id> -d /path/to/repo -m gpt-4
 ```
 
 The plan is structured with: User Story, Questions, Technical Implementation, Acceptance Criteria, and Test Paths. It is saved directly to the work item as a `# COPILOT PLAN` comment and the work item state is set to Active.
@@ -83,9 +83,9 @@ The plan is structured with: User Story, Questions, Technical Implementation, Ac
 Create a feature branch, implement the work item, run tests, and open a pull request.
 
 ```bash
-uv run azure-copilot-sdlc develop <work-item-id> -d /path/to/repo
-uv run azure-copilot-sdlc develop <work-item-id> -d /path/to/repo -r        # with review
-uv run azure-copilot-sdlc develop <work-item-id> -d /path/to/repo -m gpt-4
+uv run ado-copilot-agent develop <work-item-id> -d /path/to/repo
+uv run ado-copilot-agent develop <work-item-id> -d /path/to/repo -r        # with review
+uv run ado-copilot-agent develop <work-item-id> -d /path/to/repo -m gpt-4
 ```
 
 **Options:**
@@ -99,8 +99,8 @@ The feature branch is named `feature/<work-item-id>`. If the branch already exis
 Review code changes on the feature branch and produce a prioritized findings report.
 
 ```bash
-uv run azure-copilot-sdlc review <work-item-id> -d /path/to/repo
-uv run azure-copilot-sdlc review <work-item-id> -d /path/to/repo -m gpt-4
+uv run ado-copilot-agent review <work-item-id> -d /path/to/repo
+uv run ado-copilot-agent review <work-item-id> -d /path/to/repo -m gpt-4
 ```
 
 The reviewer checks security, correctness, test coverage, performance, code quality, and design patterns. Each finding includes severity (Critical / High / Medium / Low), file location, description, and suggested fix.
@@ -113,9 +113,9 @@ The reviewer checks security, correctness, test coverage, performance, code qual
 Run plan, develop, and review in sequence for a work item.
 
 ```bash
-uv run azure-copilot-sdlc complete <work-item-id> -d /path/to/repo
-uv run azure-copilot-sdlc complete <work-item-id> -d /path/to/repo -m gpt-4
-uv run azure-copilot-sdlc complete <work-item-id> -d /path/to/repo -b main
+uv run ado-copilot-agent complete <work-item-id> -d /path/to/repo
+uv run ado-copilot-agent complete <work-item-id> -d /path/to/repo -m gpt-4
+uv run ado-copilot-agent complete <work-item-id> -d /path/to/repo -b main
 ```
 
 If any stage fails, the sequence stops immediately with an error. Each stage runs with the same options passed to the individual commands.
@@ -141,7 +141,7 @@ python build.py --onedir
 python build.py --clean
 ```
 
-Output is placed in `src/dist/azure-copilot-sdlc` (Linux/Mac) or `src/dist/azure-copilot-sdlc.exe` (Windows).
+Output is placed in `src/dist/ado-copilot-agent` (Linux/Mac) or `src/dist/ado-copilot-agent.exe` (Windows).
 
 ## Project Structure
 

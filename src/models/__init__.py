@@ -1,4 +1,4 @@
-"""Data models for azure-copilot-sdlc"""
+"""Data models for ado-copilot-agent"""
 
 from dataclasses import dataclass
 from typing import Optional

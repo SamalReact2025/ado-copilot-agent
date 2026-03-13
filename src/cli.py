@@ -1,4 +1,4 @@
-"""CLI entry point for azure-copilot-sdlc"""
+"""CLI entry point for ado-copilot-agent"""
 
 import typer
 from rich.console import Console
@@ -20,7 +20,7 @@ console = Console()
 def show_banner():
     """Display colorful startup banner"""
     banner_text = Text(
-        "▶ azure-copilot-sdlc",
+        "▶ ado-copilot-agent",
         style="bold cyan"
     )
     console.print(banner_text)

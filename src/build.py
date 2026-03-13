@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-PyInstaller build script for azure-copilot-sdlc CLI tool.
+PyInstaller build script for ado-copilot-agent CLI tool.
 
 Usage:
     python build.py          # Build single executable using spec file
@@ -17,7 +17,7 @@ from pathlib import Path
 
 def get_pyinstaller_args(one_dir: bool = False) -> list[str]:
     """Generate PyInstaller command arguments."""
-    spec_file = Path("azure-copilot-sdlc.spec")
+    spec_file = Path("ado-copilot-agent.spec")
     
     if one_dir and spec_file.exists():
         # Modify spec file temporarily for onedir build
@@ -41,7 +41,7 @@ def get_pyinstaller_args(one_dir: bool = False) -> list[str]:
 
 def clean_build_artifacts():
     """Remove build artifacts."""
-    artifacts = ["build", "dist", "azure_copilot_sdlc.spec", "__pycache__"]
+    artifacts = ["build", "dist", "ado_copilot_agent.spec", "__pycache__"]
     for artifact in artifacts:
         artifact_path = Path(artifact)
         if artifact_path.exists():
@@ -69,12 +69,12 @@ def build(one_dir: bool = False, clean_first: bool = True):
     
     if result.returncode == 0:
         output_dir = "dist"
-        exe_name = "azure-copilot-sdlc.exe" if sys.platform == "win32" else "azure-copilot-sdlc"
+        exe_name = "ado-copilot-agent.exe" if sys.platform == "win32" else "ado-copilot-agent"
         exe_path = Path(output_dir) / (exe_name if one_dir else exe_name)
         print(f"\n✓ Build successful!")
         print(f"✓ {exe_type.capitalize()} executable created in '{output_dir}' directory")
         if one_dir:
-            print(f"✓ Run with: ./{output_dir}/azure-copilot-sdlc/azure-copilot-sdlc --help")
+            print(f"✓ Run with: ./{output_dir}/ado-copilot-agent/ado-copilot-agent --help")
         else:
             print(f"✓ Run with: ./{output_dir}/{exe_name} --help")
     else:
@@ -85,7 +85,7 @@ def build(one_dir: bool = False, clean_first: bool = True):
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(
-        description="Build azure-copilot-sdlc executable with PyInstaller"
+        description="Build ado-copilot-agent executable with PyInstaller"
     )
     parser.add_argument(
         "--onedir",
