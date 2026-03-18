@@ -4,17 +4,11 @@ from pathlib import Path
 from typing import Optional
 from models import AgentConfig
 from utilities import console_helper
+from utilities.app_config import get_config
 
 
 class AgentDiscoveryService:
     """Discover and load custom AI agents"""
-    
-    SEARCH_PATHS = [
-        ".github/agents",
-        "agents",
-        "docs/agents",
-        "."
-    ]
     
     AGENT_TYPES = {
         "plan": "planner.agent.md",
@@ -24,6 +18,7 @@ class AgentDiscoveryService:
     
     def __init__(self, working_directory: Path):
         self.working_directory = Path(working_directory).resolve()
+        self.search_paths = get_config().agent_search_paths
     
     def discover_agent(self, agent_type: str) -> Optional[AgentConfig]:
         """
@@ -35,7 +30,7 @@ class AgentDiscoveryService:
             console_helper.show_error(f"Unknown agent type: {agent_type}")
             return None
         
-        for search_path in self.SEARCH_PATHS:
+        for search_path in self.search_paths:
             candidate = self.working_directory / search_path / agent_filename
             if candidate.exists():
                 console_helper.show_info(f"Found {agent_type} agent: {candidate}")
@@ -50,7 +45,7 @@ class AgentDiscoveryService:
         
         console_helper.show_error(
             f"Could not find {agent_type} agent ({agent_filename}). "
-            f"Search paths: {', '.join(self.SEARCH_PATHS)}"
+            f"Search paths: {', '.join(self.search_paths)}"
         )
         return None
     

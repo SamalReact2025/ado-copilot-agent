@@ -15,9 +15,28 @@ class AIPlan:
     
     @classmethod
     def parse_from_markdown(cls, content: str) -> "AIPlan":
-        """Parse plan from markdown content"""
-        # This will be implemented in utilities/plan_parser.py
-        pass
+        """
+        Parse plan from markdown content.
+
+        Raises:
+            ValueError: if required sections (Technical Implementation,
+                        Acceptance Criteria) are missing from the content.
+        """
+        from utilities.plan_parser import PlanParser
+
+        parsed = PlanParser.parse(content)
+        if parsed["missing_required"]:
+            raise ValueError(
+                f"Plan is missing required sections: {', '.join(parsed['missing_required'])}"
+            )
+        sections = parsed["sections"]
+        return cls(
+            user_story=sections.get("User Story", ""),
+            technical_implementation=sections.get("Technical Implementation", ""),
+            acceptance_criteria=sections.get("Acceptance Criteria", ""),
+            test_paths=sections.get("Test Paths", ""),
+            raw_content=content,
+        )
 
 
 @dataclass

@@ -8,7 +8,14 @@ from pathlib import Path
 from typing import Optional
 from utilities.console_helper import console
 from utilities import console_helper
+from utilities.logging_helper import get_logger
+from utilities.app_config import get_config
 from models import AgentConfig
+
+_MAX_RETRIES = 2
+_RETRY_BASE_DELAY = 5  # seconds; doubles each attempt
+
+logger = get_logger(__name__)
 
 
 class CopilotAgentService:
@@ -22,8 +29,10 @@ class CopilotAgentService:
             working_directory: Working directory for agent execution
             model: Optional model parameter (e.g., 'gpt-5-mini', 'gpt-4', etc.)
         """
+        _cfg = get_config()
         self.working_directory = Path(working_directory).resolve()
-        self.model = model or "claude-sonnet-4.6"
+        self.model = model or _cfg.default_model
+        self._default_timeout = _cfg.agent_timeout
     
     def _check_copilot_available(self) -> bool:
         """Check if copilot CLI is available"""
@@ -38,7 +47,7 @@ class CopilotAgentService:
         except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
             return False
     
-    def execute_agent(
+    def _execute_once(
         self,
         agent: AgentConfig,
         prompt: str,
@@ -66,6 +75,7 @@ class CopilotAgentService:
             console_helper.show_error(
                 "Copilot CLI is not available. Please install it first."
             )
+            logger.error("Copilot CLI not found; aborting agent execution")
             return False, ""
         
         try:
@@ -89,8 +99,11 @@ class CopilotAgentService:
                             agent_content = agent_content[end + 3:].lstrip()
                     if agent_content:
                         final_prompt = f"{agent_content}\n\n{prompt}"
-                except Exception:
-                    pass  # If we can't read agent file, proceed with original prompt
+                except (FileNotFoundError, PermissionError) as e:
+                    console_helper.show_warning(f"Could not read agent file '{agent.path}': {e}. Proceeding with base prompt.")
+                except Exception as e:
+                    console_helper.show_warning(f"Unexpected error reading agent file '{agent.path}': {e}. Proceeding with base prompt.")
+                    raise
 
             cmd = [
                 "copilot",
@@ -100,9 +113,22 @@ class CopilotAgentService:
                 "--prompt", final_prompt,
             ]
 
-            # Debug: Print command as runnable one-liner
-            cmd_str = ' '.join(shlex.quote(str(arg)) for arg in cmd)
+            # Print command for debugging — redact the MCP config value to avoid leaking credentials
+            redacted_cmd = []
+            skip_next = False
+            for arg in cmd:
+                if skip_next:
+                    redacted_cmd.append("[REDACTED]")
+                    skip_next = False
+                elif arg == "--additional-mcp-config":
+                    redacted_cmd.append(arg)
+                    skip_next = True
+                else:
+                    redacted_cmd.append(str(arg))
+            cmd_str = ' '.join(shlex.quote(a) for a in redacted_cmd)
+            console_helper.show_model(model_to_use)
             console_helper.show_info(f"Running: {cmd_str}")
+            logger.info("Executing copilot command (model=%s, agent=%s)", model_to_use, agent.name if agent else "<none>")
 
             env = os.environ.copy()
             env.setdefault("PYTHONIOENCODING", "utf-8")
@@ -155,17 +181,53 @@ class CopilotAgentService:
             stderr_text = "".join(error_lines)
 
             if proc.returncode == 0:
+                logger.info("Agent completed successfully (returncode=0, output_len=%d)", len(stdout_text))
                 console_helper.show_success(f"Agent completed: {stdout_text}")
                 return True, stdout_text
             else:
+                logger.warning("Agent failed (returncode=%d): %s", proc.returncode, stderr_text[:500])
                 console_helper.show_error(f"Agent failed: {stderr_text}")
                 return False, stderr_text
         
         except subprocess.TimeoutExpired:
+            logger.error("Agent execution timed out after %ds", timeout)
             console_helper.show_error(
                 f"Agent execution timed out after {timeout} seconds"
             )
             return False, ""
         except Exception as e:
+            logger.exception("Unexpected error during agent execution: %s", e)
             console_helper.show_error(f"Agent execution failed: {str(e)}")
             return False, str(e)
+
+    def execute_agent(
+        self,
+        agent: AgentConfig,
+        prompt: str,
+        timeout: Optional[int] = None,
+        model: Optional[str] = None
+    ) -> tuple[bool, str]:
+        """
+        Execute an agent with given prompt, retrying up to _MAX_RETRIES times
+        on transient failures (timeout or non-zero exit).
+        """
+        effective_timeout = timeout if timeout is not None else self._default_timeout
+        for attempt in range(1, _MAX_RETRIES + 2):  # attempts: 1, 2, 3
+            success, output = self._execute_once(agent, prompt, effective_timeout, model)
+            if success:
+                return True, output
+            # Do not retry if CLI is simply unavailable (empty output + first attempt messaging)
+            if attempt <= _MAX_RETRIES:
+                delay = _RETRY_BASE_DELAY * (2 ** (attempt - 1))
+                logger.warning("Retry %d/%d after %ds", attempt, _MAX_RETRIES + 1, delay)
+                console_helper.show_warning(
+                    f"Agent execution failed (attempt {attempt}/{_MAX_RETRIES + 1}). "
+                    f"Retrying in {delay}s..."
+                )
+                time.sleep(delay)
+            else:
+                logger.error("Agent execution failed after %d attempts", _MAX_RETRIES + 1)
+                console_helper.show_error(
+                    f"Agent execution failed after {_MAX_RETRIES + 1} attempts."
+                )
+        return False, output

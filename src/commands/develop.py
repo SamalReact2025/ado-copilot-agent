@@ -12,6 +12,10 @@ from utilities import (
     validators
 )
 from utilities.config import get_env_variable
+from utilities.app_config import get_config
+from utilities.logging_helper import get_logger
+
+logger = get_logger(__name__)
 
 def build_develop_prompt(work_item_id: int, project: str, branch_name: str) -> str:
     """Build comprehensive prompt for development execution"""
@@ -55,7 +59,7 @@ def develop(
     directory: str = typer.Option(".", "-d", "--directory", help="Working directory"),
     with_review: bool = typer.Option(False, "-r", "--with-review", help="Run review after development"),
     model: str = typer.Option(None, "-m", "--model", help="LLM model to use (e.g., claude-sonnet-4.6, gpt-4.1)"),
-    base_branch: str = typer.Option("qa", "-b", "--base-branch", help="Base branch to branch from and sync with (default: qa)")
+    base_branch: str = typer.Option(None, "-b", "--base-branch", help="Base branch to branch from and sync with")
 ):
     """
     Implement feature based on work item plan.
@@ -73,6 +77,10 @@ def develop(
         work_dir = validators.validate_git_repo(directory)
         item_id = validators.validate_work_item_id(str(work_item_id))
         
+        # Resolve base_branch from config if not explicitly provided
+        effective_base_branch = base_branch or get_config().default_base_branch
+        
+        logger.info("Develop command started: work_item=%d, dir=%s, base_branch=%s", item_id, work_dir, effective_base_branch)
         console_helper.show_info(f"Implementing work item #{item_id}...")
         
         # Check for uncommitted changes
@@ -84,8 +92,8 @@ def develop(
             raise typer.Exit(code=1)
 
         # Checkout base branch and get latest before creating feature branch
-        if not git.checkout_and_pull(base_branch):
-            raise ValueError(f"Could not sync with {base_branch} branch")
+        if not git.checkout_and_pull(effective_base_branch):
+            raise ValueError(f"Could not sync with {effective_base_branch} branch")
 
         # Create feature branch
         branch_name = f"feature/{item_id}"
@@ -101,15 +109,15 @@ def develop(
                 return
             elif choice == "Delete and recreate":
                 git.delete_branch(branch_name, force=True)
-                git.create_branch(branch_name, from_branch=base_branch)
+                git.create_branch(branch_name, from_branch=effective_base_branch)
             else:
                 # Use existing — merge latest base branch into it
                 git.switch_branch(branch_name)
-                ok, out = git._run_git("merge", f"origin/{base_branch}", "--no-edit")
+                ok, out = git._run_git("merge", f"origin/{effective_base_branch}", "--no-edit")
                 if not ok:
-                    console_helper.show_warning(f"Could not merge origin/{base_branch} into {branch_name}: {out}")
+                    console_helper.show_warning(f"Could not merge origin/{effective_base_branch} into {branch_name}: {out}")
         else:
-            git.create_branch(branch_name, from_branch=base_branch)
+            git.create_branch(branch_name, from_branch=effective_base_branch)
         
         # Discover agent
         discovery = AgentDiscoveryService(work_dir)

@@ -12,6 +12,9 @@ from utilities import (
     validators
 )
 from utilities.config import get_env_variable
+from utilities.logging_helper import get_logger
+
+logger = get_logger(__name__)
 
 
 def build_review_prompt(work_item_id: int, project: str, branch_name: str) -> str:
@@ -57,7 +60,8 @@ Generated on {timestamp} UTC
 def review(
     work_item_id: int = typer.Argument(..., help="Azure DevOps work item ID"),
     directory: str = typer.Option(".", "-d", "--directory", help="Working directory"),
-    model: str = typer.Option(None, "-m", "--model", help="LLM model to use (e.g., claude-sonnet-4.6, gpt-4.1)")
+    model: str = typer.Option(None, "-m", "--model", help="LLM model to use (e.g., claude-sonnet-4.6, gpt-4.1)"),
+    output_file: str = typer.Option(None, "-o", "--output-file", help="Save full review output to this file")
 ):
     """
     Review code changes for a work item.
@@ -74,6 +78,7 @@ def review(
         work_dir = validators.validate_git_repo(directory)
         item_id = validators.validate_work_item_id(str(work_item_id))
         
+        logger.info("Review command started: work_item=%d, dir=%s", item_id, work_dir)
         console_helper.show_info(f"Reviewing work item #{item_id}...")
         
         # Find branch
@@ -112,7 +117,17 @@ def review(
         if not success:
             raise ValueError(f"Review failed: {output}")
         
-        console_helper.show_panel("Review Results", output[:500] + "..." if len(output) > 500 else output)
+        # Display full review output (no truncation)
+        console_helper.show_panel("Review Results", output)
+
+        # Optionally save to file
+        if output_file:
+            from pathlib import Path as _Path
+            out_path = _Path(output_file)
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            out_path.write_text(output, encoding="utf-8")
+            console_helper.show_success(f"Full review saved to: {out_path.resolve()}")
+            logger.info("Review output saved to %s", out_path.resolve())
         
     except Exception as e:
         console_helper.show_error(str(e))

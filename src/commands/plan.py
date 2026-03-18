@@ -11,6 +11,9 @@ from utilities import (
     validators
 )
 from utilities.config import get_env_variable
+from utilities.logging_helper import get_logger
+
+logger = get_logger(__name__)
 
 
 def build_combined_plan_prompt(work_item_id: int, project: str) -> str:
@@ -68,6 +71,7 @@ def plan(
         work_dir = validators.validate_git_repo(directory)
         validators.validate_work_item_id(str(work_item_id))
         
+        logger.info("Plan command started: work_item=%d, dir=%s", work_item_id, work_dir)
         console_helper.show_info(f"Planning work item #{work_item_id}...")
         
         # Discover agent

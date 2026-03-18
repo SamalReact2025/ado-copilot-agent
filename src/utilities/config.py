@@ -5,6 +5,9 @@ import sys
 from pathlib import Path
 from dotenv import load_dotenv, set_key, dotenv_values
 from . import console_helper
+import logging
+
+_config_logger = logging.getLogger("ado_copilot_agent.utilities.config")
 
 
 def _load_env_file(env_path: Path, override: bool = True):
@@ -46,6 +49,7 @@ def load_env_from_home():
         active_env = project_env_path
 
     print(f"Loading config from: {active_env}")
+    _config_logger.debug("Active env file: %s", active_env)
     
     return config_dir, env_path
 
@@ -66,8 +70,8 @@ def get_env_variable(var_name: str, prompt_text: str = None, password: bool = Tr
     # Load current values from .env file
     env_values = dotenv_values(env_path) if env_path.exists() else {}
     
-    # Check if variable exists in .env file
-    value = env_values.get(var_name)
+    # Check if variable exists in .env file or already in process environment
+    value = env_values.get(var_name) or os.environ.get(var_name)
     
     if value:
         # Set in current process environment if not already there

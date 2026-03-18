@@ -23,4 +23,8 @@ packages = ["commands", "services", "models", "utilities"]
 py-modules = ["cli"]
 
 [dependency-groups]
-dev = ["pyinstaller>=6.0.0"]
+dev = [
+    "pyinstaller>=6.0.0",
+    "pytest>=8.0",
+    "pytest-mock>=3.0",
+]

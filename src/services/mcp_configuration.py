@@ -8,6 +8,9 @@ from pathlib import Path
 from typing import Optional
 from utilities import console_helper, validators
 from utilities.config import get_env_variable
+from utilities.logging_helper import get_logger
+
+logger = get_logger(__name__)
 
 
 class McpConfigurationService:
@@ -43,7 +46,8 @@ class McpConfigurationService:
                 cwd=self.working_directory,
                 capture_output=True,
                 text=True,
-                check=True
+                check=True,
+                timeout=10
             )
             url = result.stdout.strip()
             
@@ -79,8 +83,10 @@ class McpConfigurationService:
                 prompt_text=None,  # Will use default prompt if needed
                 password=False
             )
-        except Exception:
+        except Exception as e:
             # If get_env_variable fails, try extracting from git
+            console_helper.show_warning(f"Could not load AZURE_DEVOPS_ORG from .env: {e}. Trying git remote...")
+            logger.warning("AZURE_DEVOPS_ORG lookup failed (%s); falling back to git remote", e)
             org = self._extract_org_from_git()
             if not org:
                 org = console_helper.prompt("Enter Azure DevOps organization name:", password=False)

@@ -4,6 +4,10 @@ import subprocess
 from pathlib import Path
 from typing import Optional
 from utilities import console_helper
+from utilities.logging_helper import get_logger
+from utilities.app_config import get_config
+
+logger = get_logger(__name__)
 
 
 class GitService:
@@ -11,9 +15,11 @@ class GitService:
     
     def __init__(self, working_directory: Path):
         self.working_directory = Path(working_directory).resolve()
+        self._git_timeout = get_config().git_timeout
     
-    def _run_git(self, *args, **kwargs) -> tuple[bool, str]:
+    def _run_git(self, *args, timeout: Optional[int] = None, **kwargs) -> tuple[bool, str]:
         """Run git command and return (success, output)"""
+        effective_timeout = timeout if timeout is not None else self._git_timeout
         try:
             result = subprocess.run(
                 ["git"] + list(args),
@@ -21,11 +27,22 @@ class GitService:
                 capture_output=True,
                 text=True,
                 check=False,
+                timeout=effective_timeout,
                 **kwargs
             )
             return result.returncode == 0, result.stdout.strip()
         except FileNotFoundError:
             return False, "Git not found"
+        except subprocess.TimeoutExpired:
+            console_helper.show_warning(f"Git command timed out after {effective_timeout}s: git {' '.join(str(a) for a in args)}")
+            return False, "Git command timed out"
+
+    def _log_git(self, success: bool, args: tuple) -> None:
+        cmd_str = "git " + " ".join(str(a) for a in args)
+        if success:
+            logger.debug("OK: %s", cmd_str)
+        else:
+            logger.warning("FAIL: %s", cmd_str)
     
     def get_status(self) -> str:
         """Get git status"""
@@ -75,8 +92,8 @@ class GitService:
             return False
         
         for line in output.split("\n"):
-            # Strip remotes/origin prefix and whitespace
-            line = line.strip().replace("remotes/origin/", "")
+            # Strip leading *, spaces, and remotes/origin/ prefix
+            line = line.strip().lstrip("* ").replace("remotes/origin/", "")
             if line == branch_name:
                 return True
         return False

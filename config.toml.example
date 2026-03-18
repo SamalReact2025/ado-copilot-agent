@@ -1,0 +1,34 @@
+# ado-copilot-agent configuration
+# Copy this file to ~/.ado-copilot-agent/config.toml and customise as needed.
+# All values are optional — the defaults shown here will be used if a key is absent.
+# Environment variables (ADO_DEFAULT_MODEL, ADO_AGENT_TIMEOUT, ADO_DEFAULT_BASE_BRANCH,
+# ADO_GIT_TIMEOUT) take precedence over values in this file.
+
+# LLM model to use when -m / --model is not supplied on the command line.
+# Any model identifier accepted by `copilot --model` works here.
+default_model = "claude-sonnet-4.6"
+
+# Maximum seconds to wait for the Copilot CLI to finish a single agent execution.
+# The tool will retry up to 2 times on failure before giving up.
+agent_timeout = 300
+
+# Base branch used by the `develop` command when -b / --base-branch is not supplied.
+default_base_branch = "qa"
+
+# Maximum seconds to wait for any single git subprocess call.
+git_timeout = 30
+
+# Ordered list of directories (relative to the repo root) where agent .md files
+# are searched for.  First match wins.
+agent_search_paths = [
+    ".github/agents",
+    "agents",
+    "docs/agents",
+    ".",
+]
+
+# Azure DevOps work item state names tried for each lifecycle stage.
+# The first value that is accepted by Azure DevOps will be used.
+[work_item_states]
+plan    = ["Active", "In Progress", "Committed"]
+develop = ["Resolved", "In Review"]

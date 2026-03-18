@@ -28,6 +28,11 @@ def show_info(message: str):
     console.print(f"[blue]ℹ[/blue] {message}")
 
 
+def show_model(model: str) -> None:
+    """Display the active model name as a visual rule, similar to a 'thinking' header."""
+    console.rule(f"[bold magenta]◆ {model}[/bold magenta]", style="magenta")
+
+
 def show_panel(title: str, content: str):
     """Display content in a panel"""
     panel = Panel(content, title=title, expand=False, border_style="blue")
