@@ -1,53 +1,40 @@
 """CLI entry point for ado-copilot-agent"""
 
 import typer
-from rich.console import Console
-from rich.text import Text
 
 from utilities.config import load_env_from_home
 from commands.plan import plan
 from commands.develop import develop
 from commands.review import review
 from commands.complete import complete
+from commands.interactive import interactive
 
 # Load .env from home directory
 load_env_from_home()
 
-# Create console for output
-console = Console()
-
-
-def show_banner():
-    """Display colorful startup banner"""
-    banner_text = Text(
-        "▶ ado-copilot-agent",
-        style="bold cyan"
-    )
-    console.print(banner_text)
-    console.print(Text("Azure DevOps Work Item Lifecycle Automation", style="dim"), end="\n\n")
-
-
 # Create main app
 app = typer.Typer()
 
-# Add commands directly (no subgroups)
+# Add commands
 app.command(help="Enrich work items with AI-generated implementation plans")(plan)
 app.command(help="Implement features based on plans")(develop)
 app.command(help="Review code changes before PR merge")(review)
 app.command(help="Complete full lifecycle: plan, develop, and review in sequence")(complete)
+app.command(help="Interactive REPL — select mode, enter work item ID")(interactive)
 
 
 @app.callback(invoke_without_command=True)
-def main(ctx: typer.Context):
+def main(
+    ctx: typer.Context,
+    directory: str = typer.Option(".", "-d", "--directory", help="Working directory"),
+    model: str = typer.Option(None, "-m", "--model", help="LLM model to use"),
+):
     """
     Azure DevOps work item lifecycle automation using GitHub Copilot.
-    
-    This tool helps you automate the planning, development, and review stages
-    of Azure DevOps work items using AI agents powered by GitHub Copilot.
+    Run without a sub-command to launch the interactive agent.
     """
-    # Show banner only when no command is specified
     if ctx.invoked_subcommand is None:
-        show_banner()
+        interactive(directory=directory, model=model)
 
 
 def cli():

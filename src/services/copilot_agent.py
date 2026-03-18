@@ -136,46 +136,260 @@ class CopilotAgentService:
             output_lines: list[str] = []
             error_lines: list[str] = []
 
-            start = time.time()
-            with console.status("[bold cyan]Executing agent...", spinner="dots") as status:
-                proc = subprocess.Popen(
-                    cmd,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                    encoding="utf-8",
-                    errors="replace",
-                    cwd=str(self.working_directory),
-                    env=env
-                )
+            import threading
+            import sys
+            import json as _json
 
+            # ── Animated spinner below each tool-call header ──────────────────
+            _DOT_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+            _ANSI = {
+                "cyan":    "\033[36m", "blue":    "\033[34m",
+                "yellow":  "\033[33m", "green":   "\033[32m",
+                "magenta": "\033[35m", "red":     "\033[31m",
+                "white":   "\033[37m",
+            }
+            _RST  = "\033[0m"
+            _DIM  = "\033[2m"
+            _BLD  = "\033[1m"
+
+            class _ToolAnim:
+                """
+                Prints  ● header\n  then spins on the next line.
+                On finish() replaces the spinner line with └ result.
+                Works even when ● and └ arrive back-to-back (spinner
+                may flash one frame but the output is always correct).
+                """
+                def __init__(self):
+                    self._stop    = threading.Event()
+                    self._thread  = None
+                    self._color   = ""
+                    self._pending = False
+
+                def start(self, color: str, header_rest: str) -> None:
+                    self._stop.clear()
+                    self._color   = _ANSI.get(color, _ANSI["white"])
+                    self._pending = True
+                    # Committed header line (always visible immediately)
+                    sys.stdout.write(
+                        f"{self._color}{_BLD}●{_RST}"
+                        f"{self._color}{header_rest}{_RST}\n"
+                    )
+                    # Prime spinner on the next line, no newline
+                    sys.stdout.write(f"  {self._color}{_DOT_FRAMES[0]}{_RST}  ")
+                    sys.stdout.flush()
+                    self._thread = threading.Thread(target=self._run, daemon=True)
+                    self._thread.start()
+
+                def _run(self) -> None:
+                    idx = 0
+                    while not self._stop.wait(0.08):
+                        idx = (idx + 1) % len(_DOT_FRAMES)
+                        sys.stdout.write(
+                            f"\r  {self._color}{_DOT_FRAMES[idx]}{_RST}  "
+                        )
+                        sys.stdout.flush()
+
+                def finish(self, snippet: str = "") -> None:
+                    self._stop.set()
+                    if self._thread:
+                        self._thread.join(timeout=0.3)
+                    if self._pending:
+                        result = f"└ {snippet}" if snippet else "└ done"
+                        # Erase spinner line, write result
+                        sys.stdout.write(f"\r  \033[2K{_DIM}{result}{_RST}\n")
+                        sys.stdout.flush()
+                        self._pending = False
+
+                def is_active(self) -> bool:
+                    return self._pending
+
+            _tool_anim = _ToolAnim()
+
+            # ── Tool name → (color, display label) ───────────────────────────
+            _TOOL_META = {
+                "read_file":           ("cyan",    "Read"),
+                "readFile":            ("cyan",    "Read"),
+                "read_text_file":      ("cyan",    "Read Text File"),
+                "write_file":          ("yellow",  "Write"),
+                "writeFile":           ("yellow",  "Write"),
+                "create_file":         ("yellow",  "Create File"),
+                "edit_file":           ("yellow",  "Edit File"),
+                "list_directory":      ("blue",    "List Directory"),
+                "listDirectory":       ("blue",    "List Directory"),
+                "search_files":        ("magenta", "Search Files"),
+                "searchFiles":         ("magenta", "Search Files"),
+                "search_code":         ("magenta", "Search Code"),
+                "create_directory":    ("green",   "Create Directory"),
+                "delete_file":         ("red",     "Delete"),
+                "run_command":         ("yellow",  "Run Command"),
+                "get_work_item":       ("cyan",    "Get Work Item"),
+                "create_comment":      ("green",   "Create Comment"),
+                "update_work_item":    ("green",   "Update Work Item"),
+                "create_pull_request": ("green",   "Create PR"),
+                "get_pull_request":    ("cyan",    "Get PR"),
+            }
+            _VERB_COLOR = {
+                "read": "cyan",   "get": "cyan",
+                "list": "blue",   "search": "magenta",
+                "write": "yellow","run": "yellow",   "edit": "yellow",
+                "create": "green","update": "green",
+                "delete": "red",
+            }
+
+            def _fmt_val(v, n: int = 80) -> str:
+                s = str(v).replace("\n", "\\n")
+                return s if len(s) <= n else s[:n] + "…"
+
+            def _render_line(raw: str) -> None:
+                raw = raw.rstrip()
+                if not raw:
+                    return
+
+                # ── JSON (MCP protocol events) ────────────────────────────────
+                obj = None
                 try:
-                    while True:
-                        # Read a chunk of stdout
-                        line = proc.stdout.readline() if proc.stdout else ""
-                        if line:
-                            output_lines.append(line)
-                            status.update(f"[bold green]Partial Output:\n{''.join(output_lines)[-800:]}")
+                    obj = _json.loads(raw)
+                except Exception:
+                    pass
 
-                        # Check for timeout
-                        if timeout and time.time() - start > timeout:
-                            proc.kill()
-                            raise subprocess.TimeoutExpired(cmd, timeout)
+                if isinstance(obj, dict):
+                    kind = (obj.get("type") or obj.get("event") or "").lower()
+                    if kind in ("tool_call", "tool_use", "function_call") or (
+                        "tool" in obj or "function" in obj
+                    ):
+                        tool = (
+                            obj.get("tool")
+                            or (obj.get("function") or {}).get("name", "")
+                            or obj.get("name", "")
+                        )
+                        args = obj.get("arguments") or obj.get("input") or obj.get("args") or {}
+                        if isinstance(args, str):
+                            try: args = _json.loads(args)
+                            except Exception: pass
+                        color, label = _TOOL_META.get(tool, ("white", tool))
+                        inline = next(
+                            (_fmt_val(args[k], 60) for k in
+                             ("path", "file_path", "query", "command", "id", "content")
+                             if k in (args or {})), ""
+                        )
+                        if _tool_anim.is_active():
+                            _tool_anim.finish()
+                        _tool_anim.start(color, f" {label}  {inline}")
+                        return
 
-                        # Exit loop when process ends and buffers drained
-                        if proc.poll() is not None and not line:
-                            break
+                    if kind in ("tool_result", "function_result") or "content" in obj:
+                        content = obj.get("content") or obj.get("output") or obj.get("result") or ""
+                        if isinstance(content, list):
+                            content = " ".join(
+                                c.get("text", "") if isinstance(c, dict) else str(c)
+                                for c in content
+                            )
+                        _tool_anim.finish(_fmt_val(str(content), 120))
+                        return
 
-                    # Drain remaining stdout/stderr
-                    if proc.stdout:
-                        output_lines.extend(proc.stdout.read().splitlines(keepends=True))
-                    if proc.stderr:
-                        error_lines.extend(proc.stderr.read().splitlines(keepends=True))
-                finally:
-                    if proc.stdout:
-                        proc.stdout.close()
-                    if proc.stderr:
-                        proc.stderr.close()
+                    if kind in ("message", "text", "assistant_message"):
+                        text = obj.get("text") or obj.get("content") or obj.get("message") or raw
+                        if isinstance(text, list):
+                            text = " ".join(
+                                t.get("text", "") if isinstance(t, dict) else str(t) for t in text
+                            )
+                        if _tool_anim.is_active():
+                            _tool_anim.finish()
+                        sys.stdout.write(f"{text}\n"); sys.stdout.flush()
+                        return
+
+                # ── Plain-text lines emitted by the copilot CLI ───────────────
+                stripped = raw.lstrip()
+
+                # Tool header: "● Verb  path/detail"
+                if stripped.startswith("●"):
+                    rest = stripped[1:]
+                    verb = rest.lstrip().split()[0].lower() if rest.strip() else ""
+                    color = next((v for k, v in _VERB_COLOR.items() if verb.startswith(k)), "white")
+                    if _tool_anim.is_active():
+                        _tool_anim.finish()
+                    _tool_anim.start(color, rest)
+                    return
+
+                # Result line: "  └ ..." or "  ├ ..."
+                if stripped.startswith("└") or stripped.startswith("├"):
+                    _tool_anim.finish(stripped[1:].strip())
+                    return
+
+                # Anything else (assistant reasoning, status text, etc.)
+                if _tool_anim.is_active():
+                    _tool_anim.finish()
+                sys.stdout.write(f"{raw}\n")
+                sys.stdout.flush()
+            # ─────────────────────────────────────────────────────────────────
+
+            start = time.time()
+            _dot_frames = ["   ", ".  ", ".. ", "..."]
+            _stop_anim = threading.Event()
+            _has_output = threading.Event()
+
+            def _animate() -> None:
+                idx = 0
+                while not _stop_anim.wait(timeout=0.4):
+                    if _has_output.is_set():
+                        break
+                    idx = (idx + 1) % len(_dot_frames)
+                    elapsed = int(time.time() - start)
+                    line = (
+                        f"\r  \033[35m◆ {model_to_use}\033[0m "
+                        f"\033[36mthinking\033[0m\033[36m{_dot_frames[idx]}\033[0m"
+                        f"  \033[2m{elapsed}s\033[0m   "
+                    )
+                    sys.stdout.write(line)
+                    sys.stdout.flush()
+                sys.stdout.write("\r" + " " * 72 + "\r")
+                sys.stdout.flush()
+
+            anim_thread = threading.Thread(target=_animate, daemon=True)
+            anim_thread.start()
+
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                cwd=str(self.working_directory),
+                env=env
+            )
+
+            try:
+                while True:
+                    line = proc.stdout.readline() if proc.stdout else ""
+                    if line:
+                        if not _has_output.is_set():
+                            _has_output.set()
+                            anim_thread.join(timeout=0.5)
+                        output_lines.append(line)
+                        _render_line(line)
+
+                    if timeout and time.time() - start > timeout:
+                        proc.kill()
+                        raise subprocess.TimeoutExpired(cmd, timeout)
+
+                    if proc.poll() is not None and not line:
+                        break
+
+                if proc.stdout:
+                    output_lines.extend(proc.stdout.read().splitlines(keepends=True))
+                if proc.stderr:
+                    error_lines.extend(proc.stderr.read().splitlines(keepends=True))
+            finally:
+                _stop_anim.set()
+                anim_thread.join(timeout=1)
+                # Finalize any in-flight tool animation
+                if _tool_anim.is_active():
+                    _tool_anim.finish()
+                if proc.stdout:
+                    proc.stdout.close()
+                if proc.stderr:
+                    proc.stderr.close()
 
             stdout_text = "".join(output_lines)
             stderr_text = "".join(error_lines)
